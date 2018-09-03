@@ -43,7 +43,7 @@ public class Clustering {
         ArrayList<String> fields = new ArrayList( );
         fields.add( json ) ;
         
-        if( !app.vertifyParams( fields ) ){
+        if( !app.verifyParams( fields ) ){
             return app.paramInvalid( ) ;
         }
         

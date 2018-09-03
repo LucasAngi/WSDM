@@ -1,5 +1,8 @@
 package core;
 
+import java.io.File;
+import java.io.IOException;
+import java.util.Random;
 import weka.classifiers.Classifier;
 import weka.classifiers.Evaluation;
 import weka.classifiers.bayes.NaiveBayes;
@@ -11,6 +14,9 @@ import weka.classifiers.trees.M5P;
 import weka.core.Attribute;
 import weka.core.Instance;
 import weka.core.Instances;
+import java.util.UUID;
+import weka.core.converters.ArffLoader;
+import weka.core.converters.ArffSaver;
 
 /**
  *
@@ -20,16 +26,20 @@ public class Predictor {
 
     public final static String NUMERIC_TYPE = "numeric";
     public final static String NOMINAL_TYPE = "nominal";
-    public final static String TREE = "tree";
+    public final static String TREE  = "tree";
     public final static String BAYES = "bayes";
     public final static String RULES = "rules";
-    public final static String LAZY = "lazy";
+    public final static String LAZY  = "lazy";
 
-    private Classifier classifier = null;
-    private String classificationMethod = "";
-    private String classificationType = "";
-    private String className = "";
-    private String accuracy = "";
+    private Classifier classifier       = null;
+    private String classificationMethod = "undefined";
+    private String classificationType   = "undefined";
+    private double rootMeanSquaredError ;
+    private String className  = "" ;
+    private String accuracy   = "" ;
+    private String modelsPath = System.getProperty("user.dir")+"/models/";
+    private boolean isLoaded  = false ;
+    private Instances header  = null ;
 
     public Predictor(String type, String method) {
         if (type.equals(NUMERIC_TYPE)) {
@@ -87,11 +97,63 @@ public class Predictor {
             }
         }
     }
-
-    private void accuracy(Instances data) throws Exception {
+    
+    public Predictor(String type, String method , String key) throws Exception {
+        this.header = this.getInfoHeader(key) ;
+        this.classificationMethod = method;
+        this.isLoaded = true;
+        if (type.equals(NUMERIC_TYPE)) {
+            this.classificationType = NUMERIC_TYPE;
+            switch (method) {
+                case "tree": {
+                    this.classifier = (M5P) weka.core.SerializationHelper.read( this.modelsPath+key+".model" ) ;
+                }
+                break;
+                case "rules": {
+                    this.classifier = (M5Rules) weka.core.SerializationHelper.read( this.modelsPath+key+".model" );
+                }
+                break;
+                case "lazy": {
+                    this.classifier = (IBk) weka.core.SerializationHelper.read( this.modelsPath+key+".model" );
+                }
+                break;
+            }
+        } else {
+            if (type.equals(NOMINAL_TYPE)) {
+                this.classificationType = NOMINAL_TYPE;
+                switch (method) {
+                    case "tree": {
+                        this.classifier = (J48) weka.core.SerializationHelper.read( this.modelsPath+key+".model" ) ;
+                    }
+                    break;
+                    case "rules": {
+                        this.classifier = (OneR) weka.core.SerializationHelper.read( this.modelsPath+key+".model" );
+                    }
+                    break;
+                    case "bayes": {
+                        this.classifier = (NaiveBayes) weka.core.SerializationHelper.read( this.modelsPath+key+".model" );;
+                    }
+                    break;
+                    case "lazy": {
+                        this.classifier = (IBk) weka.core.SerializationHelper.read( this.modelsPath+key+".model" );
+                    }
+                    break;
+    
+                }
+            }
+        }
+    }
+    
+    
+    private void statistics(Instances data) throws Exception {
         Evaluation eval = new Evaluation(data);
-        eval.evaluateModel(this.classifier, data);
-        this.accuracy = (eval.correct() / data.numInstances()) * 100 + "%";
+        eval.crossValidateModel(this.classifier, data, 10, new Random(1));
+        if( this.classificationType.equals( this.NOMINAL_TYPE ) ){
+            this.accuracy = Double.toString(eval.pctCorrect())+"%";
+        } else{
+            this.rootMeanSquaredError = eval.rootMeanSquaredError();
+        }
+        
     }
 
     public void setClassName(String className) {
@@ -113,37 +175,33 @@ public class Predictor {
             cont++;
         }
 
-        if (!find) {
-            throw new Exception("Invalid attribute class");
-        }
-
     }
 
     public void train(Instances data) throws Exception {
-
-        if (this.className == null || this.className.isEmpty()) {
-            throw new Exception("Empty attribute class");
-        } else {
-            this.setClassIndex(data);
-        }
+        this.setClassIndex(data);        
 
         this.classifier.buildClassifier(data);
 
         if (this.classificationType.equals(NOMINAL_TYPE)) {
-            this.accuracy(data);
+            this.statistics(data);
         }
-
+        
+        this.saveInfoHeader( data ) ;
     }
 
     public void classify(Instances data) throws Exception {
+        
         this.setClassIndex(data);
-
+                        
         for (Instance obj : data) {
             obj.setMissing(obj.classIndex());
-            obj.setMissing(obj.classIndex());
-            obj.setClassValue(this.classifier.classifyInstance(obj));
+            obj.setClassValue( this.classifier.classifyInstance(obj) );
         }
-
+        
+    }
+    
+    public boolean isLoaded(){
+        return this.isLoaded;
     }
 
     public String getClassName() {
@@ -151,16 +209,59 @@ public class Predictor {
     }
 
     public String getClassifierMethod() {
-
-        if (this.classifier == null) {
-            return "undefined";
-        }
-
         return this.classificationMethod;
     }
 
     public String getAccuracy() {
         return this.accuracy;
     }
-
+    
+    public double getRootMeanSquaredError() {
+        return this.rootMeanSquaredError;
+    }
+    
+    private void saveInfoHeader( Instances data ){
+        this.header = new Instances( data , 0 , 0 ) ;
+    }
+    
+    private Instances getInfoHeader( String key ) throws IOException{
+        ArffLoader loader = new ArffLoader(  );
+        loader.setFile( new File( this.modelsPath+key+".arff") );
+        return loader.getDataSet();
+    }
+    
+    public Instances mergeHeaderInfo( Instances data ) throws Exception{
+        this.setClassIndex(data);
+        data.replaceAttributeAt(this.header.attribute( data.classAttribute().name() ), data.classIndex() ) ;
+        return data;
+    }
+    
+    public Instances mergeHeaderInfo( Instances model , Instances predict ) throws Exception{
+        this.setClassIndex(predict);
+        predict.replaceAttributeAt(model.attribute( predict.classAttribute().name() ), predict.classIndex() ) ;
+        return predict;
+    }
+    
+    private String generateKey(){
+        return UUID.randomUUID().toString();
+    }
+    
+    public String saveModel() throws Exception{
+        String key = this.generateKey() ;
+        
+        File dir = new File( this.modelsPath ); 
+        
+        if (!dir.exists()) {
+            dir.mkdirs(); 
+        } else {
+            weka.core.SerializationHelper.write( this.modelsPath+key+".model", this.classifier ) ;
+            ArffSaver saver = new ArffSaver();
+            saver.setInstances( this.header);
+            saver.setFile(new File(this.modelsPath+key+".arff"));
+            saver.writeBatch();
+        }
+        
+        return key ;
+    }
+    
 }

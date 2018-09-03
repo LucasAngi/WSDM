@@ -32,53 +32,61 @@ public class Classification {
             @FormParam("training") String training,
             @FormParam("test") String test,
             @FormParam("class") String className,
-            @FormParam("type") String type
+            @FormParam("type") String type,
+            @FormParam("modelKey") String modelKey
     ) throws IOException, Exception {
 
         App app = new App();
         Requests request = new Requests();
         Responses response = new Responses();
-        Predictor predictor = new Predictor(Predictor.NOMINAL_TYPE, type);
-
+        
         ArrayList<String> fields = new ArrayList();
 
-        fields.add(training);
         fields.add(test);
         fields.add(className);
-
+        fields.add(type);
+        
         try {
-            if (!app.vertifyParams(fields)) {
+            if (!app.verifyParams(fields) || ( !app.verifyParam( modelKey ) && !app.verifyParam( training ) ) ) {
                 return app.paramInvalid();
             }
         } catch (Exception ex) {
             return app.paramInvalid();
         }
-
-        ArrayList<String> jsons = new ArrayList<String>();
-
-        jsons.add(training);
-        jsons.add(test);
-
-        ArrayList<Instances> datas = request.convertToInstances(jsons);
-
-        Instances model = datas.get(0);
-        Instances predict = datas.get(1);
-
-        predictor.setClassName(className);
-
-        predictor.train(model);
-
-        predictor.classify(predict);
-
+        
+        Predictor predictor  = null ;
+        Instances model      = null ;
+        Instances predict    = null ;  
+        
+        if( !app.verifyParam( training ) ){
+            predictor = new Predictor(Predictor.NOMINAL_TYPE, type, modelKey);
+            predictor.setClassName( className ) ;
+            
+            predict = request.convertToInstances( test,     Requests.OBJECT_CONVERTION ) ;
+            predict = predictor.mergeHeaderInfo( predict ) ;
+        } else {
+            predictor = new Predictor(Predictor.NOMINAL_TYPE, type );
+            predictor.setClassName(className);
+            
+            model   = request.convertToInstances( training, Requests.OBJECT_CONVERTION ) ;
+            predict = request.convertToInstances( test,     Requests.OBJECT_CONVERTION ) ;
+            
+            predict = predictor.mergeHeaderInfo( model , predict ) ;
+            
+            predictor.train(model);
+        }
+        
         JSONArray data = response.toJSON(predict);
 
         JSONObject result = new JSONObject();
         result.put("status", 0);
         result.put("type", predictor.getClassifierMethod());
         result.put("data", data);
-        result.put("accuracy", predictor.getAccuracy());
+        if( !predictor.isLoaded() ){
+            result.put("accuracy", predictor.getAccuracy());
+        }
 
-        return app.response(result);
+        return app.response(result); 
     }
     
     @GET
@@ -90,5 +98,5 @@ public class Classification {
         return app.error("The requires to this Web Service support only POST method");
 
     }
-
+    
 }

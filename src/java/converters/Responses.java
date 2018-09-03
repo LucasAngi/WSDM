@@ -20,7 +20,6 @@ public class Responses {
         JSONArray array = new JSONArray();
         JSONObject obj;
         for (Instance inst : data) {
-
             obj = new JSONObject();
 
             for (int cont = 0; cont < inst.numAttributes(); cont++) {

@@ -7,7 +7,6 @@ import vendor.App;
 import java.io.IOException;
 import java.util.ArrayList;
 import javax.ws.rs.POST;
-import javax.ws.rs.DefaultValue;
 import javax.ws.rs.FormParam;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
@@ -30,44 +29,52 @@ public class Regression {
     @Consumes({MediaType.APPLICATION_FORM_URLENCODED})
     @Produces({MediaType.APPLICATION_JSON, MediaType.TEXT_PLAIN})
     public Response post(
-            @DefaultValue("") @FormParam("training") String training,
-            @DefaultValue("") @FormParam("test") String test,
-            @DefaultValue("") @FormParam("class") String className,
-            @DefaultValue("") @FormParam("type") String type
+        @FormParam("training") String training,
+        @FormParam("test") String test,
+        @FormParam("class") String className,
+        @FormParam("type") String type,
+        @FormParam("modelKey") String modelKey
     ) throws IOException, Exception {
 
         App app = new App();
         Requests request = new Requests();
         Responses response = new Responses();
-        Predictor predictor = new Predictor(Predictor.NUMERIC_TYPE, type);
 
         ArrayList<String> fields = new ArrayList();
 
-        fields.add(training);
         fields.add(test);
         fields.add(className);
+        fields.add(type);
 
         try {
-            if (!app.vertifyParams(fields)) {
+            if (!app.verifyParams(fields) || ( !app.verifyParam( modelKey ) && !app.verifyParam( training ) ) ) {
                 return app.paramInvalid();
             }
         } catch (Exception ex) {
             return app.paramInvalid();
         }
 
-        ArrayList<String> jsons = new ArrayList<String>();
-
-        jsons.add(training);
-        jsons.add(test);
-
-        ArrayList<Instances> datas = request.convertToInstances(jsons);
-
-        Instances model = datas.get(0);
-        Instances predict = datas.get(1);
-
-        predictor.setClassName(className);
-
-        predictor.train(model);
+        Predictor predictor  = null ;
+        Instances model      = null ;
+        Instances predict    = null ;  
+        
+        if( !app.verifyParam( training ) ){
+            predictor = new Predictor(Predictor.NUMERIC_TYPE, type, modelKey);
+            predictor.setClassName( className ) ;
+            
+            predict = request.convertToInstances( test, Requests.OBJECT_CONVERTION ) ;
+            predict = predictor.mergeHeaderInfo( predict ) ;
+        } else {
+            predictor = new Predictor(Predictor.NUMERIC_TYPE, type );
+            predictor.setClassName(className);
+            
+            model   = request.convertToInstances( training, Requests.OBJECT_CONVERTION ) ;
+            predict = request.convertToInstances( test,     Requests.OBJECT_CONVERTION ) ;
+            
+            predict = predictor.mergeHeaderInfo( model , predict ) ;
+            
+            predictor.train(model);
+        }
 
         predictor.classify(predict);
 
@@ -77,6 +84,10 @@ public class Regression {
         result.put("status", 0);
         result.put("type", predictor.getClassifierMethod());
         result.put("data", data);
+        
+        if( !predictor.isLoaded() ){
+            result.put("Root Mean Squared Error", predictor.getRootMeanSquaredError());
+        }
 
         return app.response(result);
     }
@@ -90,5 +101,4 @@ public class Regression {
         return app.error("The requires to this Web Service support only POST method");
 
     }
-
 }

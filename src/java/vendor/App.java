@@ -1,21 +1,26 @@
 package vendor;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.json.JSONArray;
 import org.json.JSONObject;
-import weka.core.Attribute;
-import weka.core.Instance;
-import weka.core.Instances;
-import weka.core.json.JSONInstances;
 import weka.core.json.JSONNode;
 
 public class App {
+    
+    public final static String CLASSIFICATION = "classification";
+    public final static String REGRESSION     = "regression";
 
-    public boolean vertifyParams(ArrayList<String> fields) {
+    public boolean verifyParams(ArrayList<String> fields) {
         if (!fields.stream().noneMatch((field) -> (field.isEmpty()))) {
+            return false;
+        }
+        return true;
+    }
+    
+    public boolean verifyParam( String field) {
+        if ( field == null || field.isEmpty() ) {
             return false;
         }
         return true;
