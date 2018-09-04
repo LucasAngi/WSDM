@@ -35,6 +35,7 @@ public class Predictor {
     private String classificationMethod = "undefined";
     private String classificationType   = "undefined";
     private double rootMeanSquaredError ;
+    private double rootRelativeSquaredError ;
     private String className  = "" ;
     private String accuracy   = "" ;
     private String modelsPath = System.getProperty("user.dir")+"/models/";
@@ -147,11 +148,12 @@ public class Predictor {
     
     private void statistics(Instances data) throws Exception {
         Evaluation eval = new Evaluation(data);
-        eval.crossValidateModel(this.classifier, data, 10, new Random(1));
+        eval.crossValidateModel(this.classifier, data, 5, new Random(1));
         if( this.classificationType.equals( this.NOMINAL_TYPE ) ){
             this.accuracy = Double.toString(eval.pctCorrect())+"%";
         } else{
             this.rootMeanSquaredError = eval.rootMeanSquaredError();
+            this.rootRelativeSquaredError = eval.rootRelativeSquaredError() ;            
         }
         
     }
@@ -178,13 +180,12 @@ public class Predictor {
     }
 
     public void train(Instances data) throws Exception {
+
         this.setClassIndex(data);        
 
         this.classifier.buildClassifier(data);
 
-        if (this.classificationType.equals(NOMINAL_TYPE)) {
-            this.statistics(data);
-        }
+        this.statistics(data);
         
         this.saveInfoHeader( data ) ;
     }
@@ -195,7 +196,7 @@ public class Predictor {
                         
         for (Instance obj : data) {
             obj.setMissing(obj.classIndex());
-            obj.setClassValue( this.classifier.classifyInstance(obj) );
+            obj.setClassValue(this.classifier.classifyInstance(obj));
         }
         
     }
@@ -218,6 +219,10 @@ public class Predictor {
     
     public double getRootMeanSquaredError() {
         return this.rootMeanSquaredError;
+    }
+    
+    public double getRootRelativeSquaredError(){
+        return this.rootRelativeSquaredError;
     }
     
     private void saveInfoHeader( Instances data ){

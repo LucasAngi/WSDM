@@ -77,6 +77,7 @@ public class Training {
             result.put("accuracy", predictor.getAccuracy());
         } else if ( function.equals( App.REGRESSION ) ) {
             result.put("Root Mean Squared Error", predictor.getRootMeanSquaredError());
+            result.put("Root Relative Squared Error", predictor.getRootRelativeSquaredError());
         }
         
         return app.response(result);

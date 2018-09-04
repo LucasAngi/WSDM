@@ -87,6 +87,7 @@ public class Regression {
         
         if( !predictor.isLoaded() ){
             result.put("Root Mean Squared Error", predictor.getRootMeanSquaredError());
+            result.put("Root Relative Squared Error", predictor.getRootRelativeSquaredError());
         }
 
         return app.response(result);

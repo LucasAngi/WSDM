@@ -72,10 +72,14 @@ public class Classification {
             predict = request.convertToInstances( test,     Requests.OBJECT_CONVERTION ) ;
             
             predict = predictor.mergeHeaderInfo( model , predict ) ;
+            System.out.println( predict.toString() ) ;
+
             
             predictor.train(model);
         }
         
+        predictor.classify(predict);
+                
         JSONArray data = response.toJSON(predict);
 
         JSONObject result = new JSONObject();
