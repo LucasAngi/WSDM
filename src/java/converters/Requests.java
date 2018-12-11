@@ -7,6 +7,7 @@ import org.json.JSONObject;
 import weka.core.Instances;
 import weka.core.json.JSONInstances;
 import weka.core.json.JSONNode;
+import error.ConvertionError;
 
 /**
  *
@@ -260,17 +261,15 @@ public class Requests {
 
     }
     
-    public Instances convertToInstances( String json , String type ){
-        if( type.equals( OBJECT_CONVERTION ) ){
-            return this.toInstances( this.objectConversion( json ) ) ;
-        } else{
-            if( type.equals( ARRAY_CONVERTION ) ){
-                return this.toInstances( this.arrayConversion( json ) ) ;
+    public Instances convertToInstances( String json , String type ) throws ConvertionError{
+        try{
+            if( type.equals( OBJECT_CONVERTION ) ){
+                return this.toInstances( this.objectConversion( json ) ) ;
             } else{
-                System.err.println("Eita porra");
                 return this.toInstances( this.arrayConversion( json ) ) ;
             }
+        }catch( Exception e ){
+            throw new ConvertionError( "input" ) ;
         }
     }
-       
 }

@@ -1,13 +1,13 @@
-package core;
+package process;
 
-import java.util.ArrayList;
-import java.util.HashMap;
 import weka.clusterers.Cobweb;
 import weka.clusterers.SimpleKMeans;
 import weka.core.Attribute;
-import weka.core.DenseInstance;
 import weka.core.Instance;
 import weka.core.Instances;
+import error.NegativeParam;
+import error.ConvertionError;
+import error.FloatParam;
 
 /**
  *
@@ -33,14 +33,22 @@ public class Cluster {
         return numGroups;
     }
 
-    public void setNumGroups(Integer numGroups) {
-        this.numGroups = numGroups;
+    public void setNumGroups(String numGroups) throws NegativeParam, FloatParam {
+        try{
+            this.numGroups = Integer.parseInt( numGroups );
+            
+            if( this.numGroups <= 0 ){
+                throw new NegativeParam( "number of groups" );
+            }
+        }catch(NumberFormatException e){
+            throw new FloatParam( "number of groups" ) ;
+        }
     }
 
     public void genereateGroups( ) throws Exception {
         
         if( this.dataset == null ){
-            // lança exeção
+            throw new ConvertionError( "input" ) ;
         }
 
         if (this.numGroups == null) {

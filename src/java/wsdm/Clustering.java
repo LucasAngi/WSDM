@@ -3,7 +3,7 @@ package wsdm;
 
 import converters.Responses;
 import converters.Requests;
-import core.Cluster;
+import process.Cluster;
 import vendor.App;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -18,6 +18,9 @@ import javax.ws.rs.core.Response;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import weka.core.Instances;
+import error.ConvertionError;
+import error.NegativeParam;
+import error.FloatParam;
 
 /**
  *
@@ -32,7 +35,7 @@ public class Clustering {
     @Produces({MediaType.APPLICATION_JSON, MediaType.TEXT_PLAIN})
     public Response post( 
             @FormParam("data") String json,
-            @FormParam("numGroups") int numGroups  
+            @FormParam("numGroups") String numGroups  
     ) throws IOException, Exception {
 
         App app = new App();
@@ -47,13 +50,25 @@ public class Clustering {
             return app.paramInvalid( ) ;
         }
         
-        Instances data = request.convertToInstances(json , Requests.OBJECT_CONVERTION ) ;
+        Instances data;
         
-        cluster.setNumGroups( numGroups ) ;
-        cluster.setDataset( data ) ;
+        try{
+            data = request.convertToInstances(json , Requests.OBJECT_CONVERTION ) ;
         
-        cluster.genereateGroups( ) ;        
-        cluster.clusterInstances( ) ; 
+            cluster.setNumGroups( numGroups ) ;
+            cluster.setDataset( data ) ;
+
+            cluster.genereateGroups( ) ;        
+            cluster.clusterInstances( ) ; 
+            
+        }catch( ConvertionError e ){
+            return app.error( e.getMessage() ) ;
+        }catch( NegativeParam e ){
+            return app.error( e.getMessage() ) ;
+        }catch( FloatParam e ){
+            return app.error( e.getMessage() ) ;
+        }
+        
         
         JSONObject result = new JSONObject() ;
         result.put( "status", 0 ) ;

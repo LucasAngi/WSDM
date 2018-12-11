@@ -2,6 +2,9 @@ package wsdm;
 
 import converters.Responses;
 import converters.Requests;
+import error.ConvertionError;
+import error.FloatParam;
+import error.NegativeParam;
 import java.io.IOException;
 import java.util.ArrayList;
 import javax.ws.rs.Consumes;
@@ -13,7 +16,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import vendor.App;
-import core.Associator;
+import process.Associator;
 import org.json.JSONObject;
 import weka.core.Instances;
 
@@ -29,8 +32,8 @@ public class Association {
     @Produces({MediaType.APPLICATION_JSON, MediaType.TEXT_PLAIN})
     public Response post(
             @FormParam("data") String json,
-            @FormParam("support") double support,
-            @FormParam("confidence") double confidence
+            @FormParam("support") String support,
+            @FormParam("confidence") String confidence
     ) throws IOException, Exception {
 
         App app = new App();
@@ -44,19 +47,28 @@ public class Association {
         if (!app.verifyParams(fields)) {
             return app.paramInvalid();
         }
+        
+        try{
+            Instances data = request.convertToInstances(json, Requests.ARRAY_CONVERTION ) ;
+        
+            associator.setConfidence(confidence);
+            associator.setSupport(support);
 
-        Instances data = request.convertToInstances(json, Requests.ARRAY_CONVERTION ) ;
+            associator.findRules(data);
+        }catch( ConvertionError e ){
+            return app.error( e.getMessage() ) ;
+        }catch( NegativeParam e ){
+            return app.error( e.getMessage() ) ;
+        }catch( FloatParam e ){
+            return app.error( e.getMessage() ) ;
+        }
         
-        associator.setConfidence(confidence);
-        associator.setSupport(support);
-        
-        associator.findRules(data);
         
         JSONObject result = new JSONObject(); 
         result.put( "status", 0 ) ;
         result.put( "numRules" , associator.getNumRules( ) ) ;
         result.put( "data", response.toJSON( associator.getRules() ) ) ;
-        
+
         return app.response( result ) ;
 
     }

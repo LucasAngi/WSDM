@@ -1,4 +1,4 @@
-package core;
+package process;
 
 import java.io.File;
 import java.io.IOException;
@@ -17,6 +17,9 @@ import weka.core.Instances;
 import java.util.UUID;
 import weka.core.converters.ArffLoader;
 import weka.core.converters.ArffSaver;
+import error.ModelNotFound;
+import error.ClassNotFound;
+import error.ConvertionError;
 
 /**
  *
@@ -35,6 +38,7 @@ public class Predictor {
     private String classificationMethod = "undefined";
     private String classificationType   = "undefined";
     private double rootMeanSquaredError ;
+    private double meanAbsoluteError ;
     private double rootRelativeSquaredError ;
     private String className  = "" ;
     private String accuracy   = "" ;
@@ -100,10 +104,11 @@ public class Predictor {
     }
     
     public Predictor(String type, String method , String key) throws Exception {
-        this.header = this.getInfoHeader(key) ;
-        this.classificationMethod = method;
-        this.isLoaded = true;
-        if (type.equals(NUMERIC_TYPE)) {
+        try{
+            this.header = this.getInfoHeader(key) ;
+            this.classificationMethod = method;
+            this.isLoaded = true;
+            if (type.equals(NUMERIC_TYPE)) {
             this.classificationType = NUMERIC_TYPE;
             switch (method) {
                 case "tree": {
@@ -119,30 +124,34 @@ public class Predictor {
                 }
                 break;
             }
-        } else {
-            if (type.equals(NOMINAL_TYPE)) {
-                this.classificationType = NOMINAL_TYPE;
-                switch (method) {
-                    case "tree": {
-                        this.classifier = (J48) weka.core.SerializationHelper.read( this.modelsPath+key+".model" ) ;
+            } else {
+                if (type.equals(NOMINAL_TYPE)) {
+                    this.classificationType = NOMINAL_TYPE;
+                    switch (method) {
+                        case "tree": {
+                            this.classifier = (J48) weka.core.SerializationHelper.read( this.modelsPath+key+".model" ) ;
+                        }
+                        break;
+                        case "rules": {
+                            this.classifier = (OneR) weka.core.SerializationHelper.read( this.modelsPath+key+".model" );
+                        }
+                        break;
+                        case "bayes": {
+                            this.classifier = (NaiveBayes) weka.core.SerializationHelper.read( this.modelsPath+key+".model" );;
+                        }
+                        break;
+                        case "lazy": {
+                            this.classifier = (IBk) weka.core.SerializationHelper.read( this.modelsPath+key+".model" );
+                        }
+                        break;
+
                     }
-                    break;
-                    case "rules": {
-                        this.classifier = (OneR) weka.core.SerializationHelper.read( this.modelsPath+key+".model" );
-                    }
-                    break;
-                    case "bayes": {
-                        this.classifier = (NaiveBayes) weka.core.SerializationHelper.read( this.modelsPath+key+".model" );;
-                    }
-                    break;
-                    case "lazy": {
-                        this.classifier = (IBk) weka.core.SerializationHelper.read( this.modelsPath+key+".model" );
-                    }
-                    break;
-    
                 }
             }
-        }
+        }catch( Exception e ){
+            throw new ModelNotFound( key ) ;
+        } 
+        
     }
     
     
@@ -153,6 +162,7 @@ public class Predictor {
             this.accuracy = Double.toString(eval.pctCorrect())+"%";
         } else{
             this.rootMeanSquaredError = eval.rootMeanSquaredError();
+            this.meanAbsoluteError = eval.meanAbsoluteError() ;
             this.rootRelativeSquaredError = eval.rootRelativeSquaredError() ;            
         }
         
@@ -163,6 +173,10 @@ public class Predictor {
     }
 
     private void setClassIndex(Instances data) throws Exception {
+        
+        if( data == null ){
+            throw  new ConvertionError( "input" ) ;
+        }
 
         Instance obj = data.get(0);
         int cont = 0;
@@ -176,17 +190,21 @@ public class Predictor {
             }
             cont++;
         }
+        
+        if( !find ){
+           throw new ClassNotFound( this.className );
+        }
 
     }
 
     public void train(Instances data) throws Exception {
-
+       
         this.setClassIndex(data);        
 
         this.classifier.buildClassifier(data);
 
         this.statistics(data);
-        
+    
         this.saveInfoHeader( data ) ;
     }
 
@@ -219,6 +237,10 @@ public class Predictor {
     
     public double getRootMeanSquaredError() {
         return this.rootMeanSquaredError;
+    }
+    
+    public double getMeanAbsoluteError() {
+        return this.meanAbsoluteError;
     }
     
     public double getRootRelativeSquaredError(){

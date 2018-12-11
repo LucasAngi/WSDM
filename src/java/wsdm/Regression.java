@@ -2,7 +2,10 @@ package wsdm;
 
 import converters.Responses;
 import converters.Requests;
-import core.Predictor;
+import error.ClassNotFound;
+import error.ConvertionError;
+import error.ModelNotFound;
+import process.Predictor;
 import vendor.App;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -59,24 +62,43 @@ public class Regression {
         Instances predict    = null ;  
         
         if( !app.verifyParam( training ) ){
-            predictor = new Predictor(Predictor.NUMERIC_TYPE, type, modelKey);
-            predictor.setClassName( className ) ;
-            
-            predict = request.convertToInstances( test, Requests.OBJECT_CONVERTION ) ;
-            predict = predictor.mergeHeaderInfo( predict ) ;
-        } else {
-            predictor = new Predictor(Predictor.NUMERIC_TYPE, type );
-            predictor.setClassName(className);
-            
-            model   = request.convertToInstances( training, Requests.OBJECT_CONVERTION ) ;
-            predict = request.convertToInstances( test,     Requests.OBJECT_CONVERTION ) ;
-            
-            predict = predictor.mergeHeaderInfo( model , predict ) ;
-            
-            predictor.train(model);
-        }
+            try{
+                predictor = new Predictor(Predictor.NUMERIC_TYPE, type, modelKey);
+                predictor.setClassName( className ) ;
 
-        predictor.classify(predict);
+                predict = request.convertToInstances( test, Requests.OBJECT_CONVERTION ) ;
+                predict = predictor.mergeHeaderInfo( predict ) ;
+            }catch( ModelNotFound e ){
+                return app.error( e.getMessage() ) ;
+            }catch( ClassNotFound e ){
+                return app.error( e.getMessage() ) ;
+            }catch( ConvertionError e ){
+                return app.error( e.getMessage() ) ;
+            }
+            
+        } else {
+            try{
+                predictor = new Predictor(Predictor.NUMERIC_TYPE, type );
+                predictor.setClassName(className);
+
+                model   = request.convertToInstances( training, Requests.OBJECT_CONVERTION ) ;
+                predict = request.convertToInstances( test,     Requests.OBJECT_CONVERTION ) ;
+
+                predict = predictor.mergeHeaderInfo( model , predict ) ;
+
+                predictor.train(model);
+            }catch( ClassNotFound e ){
+                return app.error( e.getMessage() ) ;
+            }catch( ConvertionError e ){
+                return app.error( e.getMessage() ) ;
+            }
+        }
+        
+        try{
+            predictor.classify(predict);
+        }catch( ClassNotFound e ){
+            return app.error( e.getMessage() ) ;
+        }
 
         JSONArray data = response.toJSON(predict);
 
@@ -86,8 +108,7 @@ public class Regression {
         result.put("data", data);
         
         if( !predictor.isLoaded() ){
-            result.put("Root Mean Squared Error", predictor.getRootMeanSquaredError());
-            result.put("Root Relative Squared Error", predictor.getRootRelativeSquaredError());
+            result.put("mae", predictor.getMeanAbsoluteError());
         }
 
         return app.response(result);

@@ -40,14 +40,14 @@ public class App {
     public Response paramInvalid() {
         JSONObject response = new JSONObject();
         response.put("message", "Mandatory parameters not reported");
-        response.put("status", -988);
+        response.put("status", -1);
         return Response.ok(response.toString(), MediaType.APPLICATION_JSON).build();
     }
 
     public Response error(String msg) {
         JSONObject response = new JSONObject();
         response.put("message", msg);
-        response.put("status", -999);
+        response.put("status", -1);
         return Response.ok(response.toString(), MediaType.APPLICATION_JSON).build();
     }
 

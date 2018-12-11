@@ -2,7 +2,7 @@ package wsdm;
 
 import converters.Responses;
 import converters.Requests;
-import core.Predictor;
+import process.Predictor;
 import vendor.App;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -17,6 +17,9 @@ import javax.ws.rs.core.Response;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import weka.core.Instances;
+import error.ModelNotFound ;
+import error.ClassNotFound ;
+import error.ConvertionError;
 
 /**
  *
@@ -59,26 +62,47 @@ public class Classification {
         Instances predict    = null ;  
         
         if( !app.verifyParam( training ) ){
-            predictor = new Predictor(Predictor.NOMINAL_TYPE, type, modelKey);
-            predictor.setClassName( className ) ;
+            try{
+                predictor = new Predictor(Predictor.NOMINAL_TYPE, type, modelKey);
+                
+                predictor.setClassName( className ) ;
             
-            predict = request.convertToInstances( test,     Requests.OBJECT_CONVERTION ) ;
-            predict = predictor.mergeHeaderInfo( predict ) ;
+                predict = request.convertToInstances( test,     Requests.OBJECT_CONVERTION ) ;
+                predict = predictor.mergeHeaderInfo( predict ) ;
+            }catch( ModelNotFound e ){
+                return app.error( e.getMessage() ) ;
+            }catch( ClassNotFound e ){
+                return app.error( e.getMessage() ) ;
+            }catch( ConvertionError e ){
+                return app.error( e.getMessage() ) ;
+            }
+            
+           
         } else {
-            predictor = new Predictor(Predictor.NOMINAL_TYPE, type );
-            predictor.setClassName(className);
-            
-            model   = request.convertToInstances( training, Requests.OBJECT_CONVERTION ) ;
-            predict = request.convertToInstances( test,     Requests.OBJECT_CONVERTION ) ;
-            
-            predict = predictor.mergeHeaderInfo( model , predict ) ;
-            System.out.println( predict.toString() ) ;
+            try{
+                predictor = new Predictor(Predictor.NOMINAL_TYPE, type );
+                predictor.setClassName(className);
 
-            
-            predictor.train(model);
+                model   = request.convertToInstances( training, Requests.OBJECT_CONVERTION ) ;
+                predict = request.convertToInstances( test,     Requests.OBJECT_CONVERTION ) ;
+
+                predict = predictor.mergeHeaderInfo( model , predict ) ;
+                System.out.println( predict.toString() ) ;
+
+                predictor.train(model);
+            }catch( ClassNotFound e ){
+                return app.error( e.getMessage() ) ;
+            }catch( ConvertionError e ){
+                return app.error( e.getMessage() ) ;
+            }
         }
         
-        predictor.classify(predict);
+        try{
+            predictor.classify(predict);
+        } catch( ClassNotFound e ){
+            return app.error( e.getMessage() ) ;
+        }
+        
                 
         JSONArray data = response.toJSON(predict);
 
@@ -86,6 +110,7 @@ public class Classification {
         result.put("status", 0);
         result.put("type", predictor.getClassifierMethod());
         result.put("data", data);
+        
         if( !predictor.isLoaded() ){
             result.put("accuracy", predictor.getAccuracy());
         }

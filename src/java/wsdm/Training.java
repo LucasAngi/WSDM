@@ -6,7 +6,9 @@
 package wsdm;
 
 import converters.Requests;
-import core.Predictor;
+import error.ClassNotFound;
+import error.ConvertionError;
+import process.Predictor;
 import java.io.IOException;
 import java.util.ArrayList;
 import javax.ws.rs.POST;
@@ -62,22 +64,25 @@ public class Training {
             predictor = new Predictor(Predictor.NUMERIC_TYPE, type);
         }
         
+        try{
+            Instances train = request.convertToInstances( training, Requests.OBJECT_CONVERTION ) ;
         
-        Instances train = request.convertToInstances( training, Requests.OBJECT_CONVERTION ) ;
-        
-        predictor.setClassName(className);
-        predictor.train( train )  ;
+            predictor.setClassName(className);
+            predictor.train( train )  ;
+        }catch( ClassNotFound e ){
+            return app.error( e.getMessage() ) ;
+        }catch( ConvertionError e ){
+            return app.error( e.getMessage() ) ;
+        }
         
         JSONObject result = new JSONObject();
         result.put("status", 0);
-        result.put("type", predictor.getClassifierMethod());
-        result.put("data", predictor.saveModel() ) ;
+        result.put("modelKey", predictor.saveModel() ) ;
         
         if( function.equals( App.CLASSIFICATION ) ){
             result.put("accuracy", predictor.getAccuracy());
         } else if ( function.equals( App.REGRESSION ) ) {
-            result.put("Root Mean Squared Error", predictor.getRootMeanSquaredError());
-            result.put("Root Relative Squared Error", predictor.getRootRelativeSquaredError());
+            result.put("mae", predictor.getMeanAbsoluteError());
         }
         
         return app.response(result);
